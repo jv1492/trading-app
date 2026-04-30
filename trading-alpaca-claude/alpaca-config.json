@@ -1,0 +1,7 @@
+{
+  "account": "trade-app",
+  "baseUrl": "https://paper-api.alpaca.markets/v2",
+  "apiKey": "PK5TSOUE524H625IZGF3BJZEBF",
+  "secretKey": "HbQseBQaXpEFHDE21zZCSQUi2GhhWfWnmUKZqC1Vvh2x",
+  "mode": "paper"
+}
