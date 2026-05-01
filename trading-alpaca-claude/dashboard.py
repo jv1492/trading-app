@@ -629,7 +629,9 @@ else:
 
 if not_detected:
     with st.expander("Not active patterns"):
-        st.caption(",  ".join(p[1] for p in not_detected))
+        seen = set()
+        unique = [p[1] for p in not_detected if not (p[1] in seen or seen.add(p[1]))]
+        st.caption(",  ".join(unique))
 
 st.markdown("---")
 
