@@ -51,6 +51,8 @@ st.set_page_config(
 
 st.markdown("""
 <style>
+    div[data-testid="stMainBlockContainer"] { padding: 3rem 5rem 5rem 2rem !important; }
+    div[data-testid="stMainBlockContainer"] h1 { font-size: 2.25rem !important; }
     .metric-card {
         background: #1e1e2e; border-radius: 10px;
         padding: 16px; text-align: center; margin: 4px 0;
@@ -66,6 +68,8 @@ st.markdown("""
     div[data-testid="stMetricValue"] { font-size: 1.5rem !important; }
     div[data-testid="stMetricLabel"] { font-size: 0.75rem !important;
                                        color: #a0a0b0 !important; }
+    section[data-testid="stSidebar"] h1 {margin-top:-3rem; border: 0px solid red; }
+
 </style>
 """, unsafe_allow_html=True)
 
