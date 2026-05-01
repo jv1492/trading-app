@@ -43,7 +43,7 @@ SCAN_UNIVERSE = [
 
 # ── Page Config ──────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Stock Analyzer",
+    page_title="Julio's Stock Analyzer",
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -57,6 +57,7 @@ st.markdown("""
         background: #1e1e2e; border-radius: 10px;
         padding: 16px; text-align: center; margin: 4px 0;
     }
+    div [data-testid="stMarkdownContainer"] h2 {border: 1px solid red; padding: 0.5rem;}
     .signal-pos  { color: #00c896; font-weight: 700; }
     .signal-neg  { color: #ff4d6d; font-weight: 700; }
     .signal-neu  { color: #a0a0b0; font-weight: 700; }
@@ -69,9 +70,12 @@ st.markdown("""
     div[data-testid="stMetricLabel"] { font-size: 0.75rem !important;
                                        color: #a0a0b0 !important; }
     section[data-testid="stSidebar"] h1 {margin-top:-3rem; border: 0px solid red; }
-
+    .subtitle { font-size: 1.2rem !important; font-weight: 600; margin-top: -1rem !important; color: inherit; }
 </style>
 """, unsafe_allow_html=True)
+
+def st_subtitle(text):
+    st.markdown(f'<p class="subtitle">{text}</p>', unsafe_allow_html=True)
 
 # ── Indicator Calculations ────────────────────────────────────────────
 
@@ -462,7 +466,8 @@ if "selected_ticker" not in st.session_state:
     st.session_state["selected_ticker"] = "TSLA"
 
 with st.sidebar:
-    st.title("📈 Stock Analyzer")
+    st.title("📈 Julio Cesar")
+    st_subtitle("Stock Analyzer")
     st.markdown("---")
 
     # Quick picks — update session state and rerun so text input reflects the value
