@@ -394,6 +394,7 @@ st.caption(f"{d['sector']} / {d['industry']}  ·  Generated {datetime.now().strf
 st.markdown("---")
 
 # ── Top KPIs ──────────────────────────────────────────────────────────
+st.markdown('<p class="section-hdr">Current Price | Technical Rating</p>', unsafe_allow_html=True)
 k1,k2,k3,k4,k5 = st.columns(5)
 score_color = "normal" if d["tech_score"] >= 7 else ("off" if d["tech_score"] < 4 else "normal")
 k1.metric("Current Price",   f"${d['cur']:.2f}")
@@ -407,6 +408,19 @@ k5.metric("RSI (14)",        f"{d['rsi_v']:.1f}",
           "Overbought" if d['rsi_v']>70 else ("Oversold" if d['rsi_v']<30 else "Neutral"))
 
 st.markdown("---")
+
+# ── Trade Setup ───────────────────────────────────────────────────────
+st.markdown('<p class="section-hdr">Example Trade Setup</p>', unsafe_allow_html=True)
+st.warning("⚠ Auto-generated — not financial advice. Always set your own entry and exit points.")
+
+t1,t2,t3,t4,t5,t6 = st.columns(6)
+t1.metric("Entry",     f"${d['entry']:.2f}",   "Buy stop above 10d high")
+t2.metric("Stop Loss", f"${d['stop_loss']:.2f}", f"Below support ${d['near_sup']:.2f}")
+t3.metric("Target",    f"${d['target']:.2f}",  "Nearest resistance")
+t4.metric("Distance",  f"{d['distance']:.2f}%", f"${d['risk_sh']:.2f}/share")
+t5.metric("Reward",    f"{d['reward']:.2f}%",  f"R/R  1:{d['rr']:.1f}")
+t6.metric("Shares",    f"{d['shares']}",
+          f"${d['cap_use']:,.0f} ({d['cap_pct']:.1f}% acct)")
 
 # ── Price Chart + Volume ───────────────────────────────────────────────
 st.markdown('<p class="section-hdr">Price History (1 Year)</p>', unsafe_allow_html=True)
@@ -555,6 +569,9 @@ else:
 st.markdown("---")
 
 # ── Shared card renderer ──────────────────────────────────────────────
+def _pick_ticker(sym):
+    st.session_state["selected_ticker"] = sym
+
 def render_stock_cards(rows, key_prefix):
     if not rows:
         st.caption("Could not load data.")
@@ -575,10 +592,9 @@ def render_stock_cards(rows, key_prefix):
             f"{arrow} {abs(chg):.2f}%</div></div>",
             unsafe_allow_html=True
         )
-        if cols[i].button("↗", key=f"{key_prefix}_{sym}", help=f"Analyze {sym}",
-                          use_container_width=True):
-            st.session_state["selected_ticker"] = sym
-            st.rerun()
+        cols[i].button("↗", key=f"{key_prefix}_{sym}", help=f"Analyze {sym}",
+                       use_container_width=True,
+                       on_click=_pick_ticker, args=(sym,))
 
 # ── Most Active ───────────────────────────────────────────────────────
 st.markdown('<p class="section-hdr">⚡ Most Active  —  Yahoo Finance</p>', unsafe_allow_html=True)
@@ -617,15 +633,4 @@ if not_detected:
 
 st.markdown("---")
 
-# ── Trade Setup ───────────────────────────────────────────────────────
-st.markdown('<p class="section-hdr">Example Trade Setup</p>', unsafe_allow_html=True)
-st.warning("⚠ Auto-generated — not financial advice. Always set your own entry and exit points.")
 
-t1,t2,t3,t4,t5,t6 = st.columns(6)
-t1.metric("Entry",     f"${d['entry']:.2f}",   "Buy stop above 10d high")
-t2.metric("Stop Loss", f"${d['stop_loss']:.2f}", f"Below support ${d['near_sup']:.2f}")
-t3.metric("Target",    f"${d['target']:.2f}",  "Nearest resistance")
-t4.metric("Distance",  f"{d['distance']:.2f}%", f"${d['risk_sh']:.2f}/share")
-t5.metric("Reward",    f"{d['reward']:.2f}%",  f"R/R  1:{d['rr']:.1f}")
-t6.metric("Shares",    f"{d['shares']}",
-          f"${d['cap_use']:,.0f} ({d['cap_pct']:.1f}% acct)")
