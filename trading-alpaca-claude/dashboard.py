@@ -572,7 +572,7 @@ st.markdown("---")
 def _pick_ticker(sym):
     st.session_state["selected_ticker"] = sym
 
-def render_stock_cards(rows, key_prefix):
+def render_stock_cards(rows, key_prefix, yahoo_link=False):
     if not rows:
         st.caption("Could not load data.")
         return
@@ -592,9 +592,13 @@ def render_stock_cards(rows, key_prefix):
             f"{arrow} {abs(chg):.2f}%</div></div>",
             unsafe_allow_html=True
         )
-        cols[i].button("↗", key=f"{key_prefix}_{sym}", help=f"Analyze {sym}",
-                       use_container_width=True,
-                       on_click=_pick_ticker, args=(sym,))
+        if yahoo_link:
+            cols[i].link_button("↗", url=f"https://finance.yahoo.com/quote/{sym}/",
+                                 use_container_width=True)
+        else:
+            cols[i].button("↗", key=f"{key_prefix}_{sym}", help=f"Analyze {sym}",
+                           use_container_width=True,
+                           on_click=_pick_ticker, args=(sym,))
 
 # ── Most Active ───────────────────────────────────────────────────────
 st.markdown('<p class="section-hdr">⚡ Most Active  —  Yahoo Finance</p>', unsafe_allow_html=True)
@@ -604,7 +608,7 @@ st.markdown("---")
 
 # ── Trending Now ──────────────────────────────────────────────────────
 st.markdown('<p class="section-hdr">🔥 Trending Now  —  Yahoo Finance</p>', unsafe_allow_html=True)
-render_stock_cards(get_trending(), "tr")
+render_stock_cards(get_trending(), "tr", yahoo_link=True)
 
 st.markdown("---")
 
