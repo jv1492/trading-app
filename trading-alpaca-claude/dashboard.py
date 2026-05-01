@@ -602,7 +602,7 @@ def render_stock_cards(rows, key_prefix, yahoo_link=False):
 
 # ── Most Active ───────────────────────────────────────────────────────
 st.markdown('<p class="section-hdr">⚡ Most Active  —  Yahoo Finance</p>', unsafe_allow_html=True)
-render_stock_cards(get_most_active(), "ma")
+render_stock_cards(get_most_active(), "ma", yahoo_link=True)
 
 st.markdown("---")
 
