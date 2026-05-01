@@ -1,0 +1,10 @@
+To relaunch dashboard anytime:
+streamlit run trading-alpaca-claude/dashboard.py
+
+Restart the dashboard to see it:
+streamlit run dashboard.py
+treamlit run trading-alpaca-claude/dashboard.py
+
+For better performance, install the Watchdog module:
+$ xcode-select --install
+$ pip install watchdog

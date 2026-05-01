@@ -40,6 +40,17 @@ POLL_SEC      = 30     # seconds between price checks
 def log(msg):
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
 
+def market_is_open():
+    r = requests.get(f"{BASE_URL}/clock", headers=HEADERS)
+    if r.status_code == 200:
+        clock = r.json()
+        if not clock.get("is_open"):
+            log(f"Market is CLOSED. Next open: {clock.get('next_open', 'unknown')}")
+            return False
+        return True
+    log("WARNING: Could not verify market hours. Aborting to be safe.")
+    return False
+
 def post(path, data):
     r = requests.post(f"{BASE_URL}{path}", headers=HEADERS, json=data)
     return r.json()
@@ -86,6 +97,10 @@ def print_order(label, o):
 # ── Setup: Place all orders ──────────────────────────────────────────
 def setup():
     log(f"=== TSLA Trailing Stop Strategy — Setup ===\n")
+
+    if not market_is_open():
+        log("Aborting setup — will not place orders while market is closed.")
+        return None
 
     # Step 1: Market buy 10 shares
     log("Placing initial market buy: 10 shares TSLA")
@@ -166,6 +181,10 @@ def monitor(entry, stop_floor, trail_on):
             # Trigger: sell everything
             if price <= floor:
                 log(f"STOP TRIGGERED — ${price:.2f} hit floor ${floor:.2f}. Closing full position...")
+                if not market_is_open():
+                    log("Market is closed — will retry sell on next poll when market opens.")
+                    time.sleep(POLL_SEC)
+                    continue
                 result = close_position()
                 log(f"Position closed: {result}")
                 log("Strategy complete.")

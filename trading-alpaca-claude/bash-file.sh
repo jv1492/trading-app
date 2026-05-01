@@ -61,5 +61,21 @@ SECRET_KEY="HbQseBQaXpEFHDE21zZCSQUi2GhhWfWnmUKZqC1Vvh2x"
 
 
 # ─────────────────────────────────────────────
+# MARKET HOURS CHECK (run before any order)
+# ─────────────────────────────────────────────
+
+# Check if market is currently open
+# curl -s -X GET "$BASE_URL/clock" \
+#   -H "APCA-API-KEY-ID: $API_KEY" \
+#   -H "APCA-API-SECRET-KEY: $SECRET_KEY" | python3 -m json.tool
+
+# One-liner: print is_open true/false
+# curl -s "$BASE_URL/clock" \
+#   -H "APCA-API-KEY-ID: $API_KEY" \
+#   -H "APCA-API-SECRET-KEY: $SECRET_KEY" \
+#   | python3 -c "import sys,json; c=json.load(sys.stdin); print('OPEN' if c['is_open'] else f\"CLOSED — opens {c['next_open']}\")"
+
+
+# ─────────────────────────────────────────────
 # FUTURE CODE GOES BELOW
 # ─────────────────────────────────────────────
