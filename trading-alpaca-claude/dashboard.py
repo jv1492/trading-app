@@ -15,6 +15,32 @@ import requests
 import plotly.graph_objects as go
 from datetime import datetime
 
+# ── Breakout screener universe (~180 liquid US stocks) ────────────────
+SCAN_UNIVERSE = [
+    "AAPL","MSFT","NVDA","AMZN","META","GOOGL","TSLA","AVGO","JPM","V",
+    "MA","UNH","XOM","LLY","JNJ","WMT","PG","HD","MRK","COST","ABBV","CVX",
+    "BAC","NFLX","CRM","AMD","ACN","TMO","PEP","KO","ORCL","MCD","ABT","NKE",
+    "DHR","CSCO","TXN","NEE","ADBE","INTC","LIN","UNP","PM","AMGN","LOW","MDT",
+    "HON","UPS","RTX","QCOM","ELV","GS","MS","SBUX","INTU","T","DE","AXP",
+    "CAT","ISRG","BKNG","GILD","SPGI","BLK","SYK","ADI","REGN","MDLZ","VRTX",
+    "SCHW","CB","PLD","CI","AMAT","MU","LRCX","PANW","KLAC","SNPS","CDNS",
+    "CME","ICE","MMC","AON","MCO","TRV","ALL","PGR","AFL","MET","PRU",
+    "DUK","SO","AEP","SRE","D","EXC","XEL","WEC","ES","ETR",
+    "AMT","PLD","CCI","EQIX","PSA","SPG","O","WELL","DLR","AVB",
+    "FCX","NEM","GOLD","AA","CLF","X","RS","CMC","NUE","STLD",
+    "SLB","HAL","BKR","OXY","COP","DVN","FANG","MRO","APA","EOG",
+    "GE","MMM","EMR","ETN","PH","ROK","IR","AME","GWW","FTV",
+    "TSM","ASML","SAP","TM","SONY","BABA","JD","PDD","SE","MELI",
+    "COIN","HOOD","SQ","PYPL","AFRM","SOFI","NU","ADYEY",
+    "UBER","LYFT","DASH","ABNB","BKNG","EXPE","MAR","HLT","H",
+    "DIS","CMCSA","WBD","PARA","FOX","NYT","SPOT","TTWO","EA","ATVI",
+    "CVS","WBA","MCK","ABC","CAH","HCA","THC","UHS","CNC","MOH",
+    "F","GM","STLA","TM","HMC","RIVN","LCID","NIO","LI","XPEV",
+    "WFC","C","USB","PNC","TFC","CFG","KEY","RF","FITB","HBAN",
+    "PLTR","AI","SNOW","DDOG","NET","ZS","CRWD","OKTA","S","FTNT",
+    "ZM","DOCN","DBX","BOX","TWLO","MDB","ESTC","CFLT","GTLB","PATH",
+]
+
 # ── Page Config ──────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Stock Analyzer",
@@ -307,6 +333,90 @@ def get_trending():
         return rows
     except Exception:
         return []
+
+@st.cache_data(ttl=86400)
+def run_breakout_scan():
+    tickers = list(dict.fromkeys(SCAN_UNIVERSE))
+    try:
+        raw = yf.download(tickers, period="6mo", interval="1d",
+                          group_by="ticker", progress=False,
+                          auto_adjust=True, threads=True)
+        spy_c = yf.download("SPY", period="6mo", interval="1d",
+                             progress=False, auto_adjust=True)["Close"]
+    except Exception:
+        return []
+
+    results = []
+    for sym in tickers:
+        try:
+            df = raw[sym].dropna() if len(tickers) > 1 else raw.dropna()
+            if len(df) < 60: continue
+            C, H, L, V = df["Close"], df["High"], df["Low"], df["Volume"]
+            cur = float(C.iloc[-1])
+            if cur < 20: continue
+            avg_vol = float(V.rolling(50).mean().iloc[-1])
+            if avg_vol < 500_000: continue
+
+            s20  = C.rolling(20).mean()
+            s50  = C.rolling(50).mean()
+            s200 = C.rolling(min(200, len(C))).mean()
+            s20v, s50v, s200v = float(s20.iloc[-1]), float(s50.iloc[-1]), float(s200.iloc[-1])
+            s20_sl = float(s20.iloc[-1] - s20.iloc[-6])
+            s50_sl = float(s50.iloc[-1] - s50.iloc[-6])
+
+            d    = C.diff()
+            g    = d.clip(lower=0).rolling(14).mean()
+            lv   = (-d.clip(upper=0)).rolling(14).mean()
+            rsi_v = float(100 - (100 / (1 + g / lv.replace(0, np.nan))).iloc[-1])
+
+            ml   = C.ewm(span=12, adjust=False).mean() - C.ewm(span=26, adjust=False).mean()
+            mh_v = float((ml - ml.ewm(span=9, adjust=False).mean()).iloc[-1])
+
+            bb_std = C.rolling(20).std()
+            bb_lo  = s20 - 2 * bb_std
+            bb_hi  = s20 + 2 * bb_std
+            bb_pct = float(((C - bb_lo) / (bb_hi - bb_lo).replace(0, np.nan)).iloc[-1])
+
+            tr      = pd.concat([(H-L),(H-C.shift()).abs(),(L-C.shift()).abs()], axis=1).max(axis=1)
+            atr_pct = float(tr.rolling(20).mean().iloc[-1] / cur * 100)
+
+            try:
+                cmb  = pd.concat([C.rename("s"), spy_c.rename("spy")], axis=1).dropna()
+                sr   = float((cmb["s"].iloc[-1]  - cmb["s"].iloc[0])   / cmb["s"].iloc[0])
+                spyr = float((cmb["spy"].iloc[-1] - cmb["spy"].iloc[0]) / cmb["spy"].iloc[0])
+                rs_sc = round(min(99, max(1, 50 + (sr - spyr) * 100 * 1.2)), 1)
+            except Exception:
+                rs_sc = 50.0
+
+            trend_up = cur > s20v and cur > s50v and s20_sl > 0 and s50_sl > 0
+
+            sc = 0.0
+            if trend_up:                sc += 2.0
+            if cur > s200v:             sc += 1.0
+            if 50 <= rsi_v <= 70:       sc += 2.0
+            elif 45 <= rsi_v < 50:      sc += 0.5
+            if mh_v > 0:                sc += 1.5
+            if 0.4 <= bb_pct <= 0.75:   sc += 2.0
+            elif 0.75 < bb_pct <= 0.88: sc += 0.5
+            if atr_pct < 2.5:           sc += 1.0
+            if rs_sc > 60:              sc += 1.5
+            elif rs_sc > 50:            sc += 0.5
+
+            results.append({
+                "Ticker": sym,
+                "Price":  f"${cur:.2f}",
+                "Score":  round(sc, 1),
+                "RSI":    round(rsi_v, 1),
+                "RS":     round(rs_sc, 1),
+                "BB %B":  round(bb_pct, 2),
+                "ATR %":  round(atr_pct, 2),
+                "Trend":  "↑ UP" if trend_up else "—",
+                "MACD":   "▲" if mh_v > 0 else "▼",
+            })
+        except Exception:
+            continue
+
+    return sorted(results, key=lambda x: x["Score"], reverse=True)[:25]
 
 @st.cache_data(ttl=3600)
 def get_analyst_data(ticker):
@@ -639,4 +749,50 @@ if not_detected:
 
 st.markdown("---")
 
+# ── Breakout Screener ─────────────────────────────────────────────────
+st.markdown('<p class="section-hdr">🔍 Breakout Screener  —  Top Technical Setups</p>', unsafe_allow_html=True)
+st.caption(f"Scans ~{len(SCAN_UNIVERSE)} liquid US stocks · Price > $20 · Avg Vol > 500K · Cached daily")
 
+sc_col1, sc_col2 = st.columns([1, 5])
+run_scan = sc_col1.button("▶ Run Scan", type="primary", use_container_width=True)
+sc_col2.caption("Scores each stock on trend alignment, RSI 50–70, MACD, Bollinger consolidation, and relative strength vs SPY. Takes ~30–60s.")
+
+if run_scan:
+    run_breakout_scan.clear()
+
+if run_scan or "scan_done" in st.session_state:
+    st.session_state["scan_done"] = True
+    with st.spinner("Scanning breakout setups across the universe... (~30–60s on first run)"):
+        scan_results = run_breakout_scan()
+
+    if scan_results:
+        st.success(f"Top {len(scan_results)} breakout setups found — sorted by score")
+
+        score_col = [r["Score"] for r in scan_results]
+        max_score = max(score_col) if score_col else 1
+
+        header = st.columns([1.2, 1, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8])
+        for col, label in zip(header, ["Ticker","Price","Score","RSI","RS","BB %B","ATR %","Trend","MACD","Chart"]):
+            col.markdown(f"**{label}**")
+        st.markdown("<hr style='margin:4px 0'>", unsafe_allow_html=True)
+
+        for r in scan_results:
+            score_pct = r["Score"] / max_score
+            bar_color = "#00c896" if score_pct > 0.75 else ("#ffd166" if score_pct > 0.5 else "#a0a0b0")
+            trend_color = "#00c896" if "UP" in r["Trend"] else "#a0a0b0"
+            macd_color  = "#00c896" if r["MACD"] == "▲" else "#ff4d6d"
+
+            row = st.columns([1.2, 1, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8])
+            row[0].markdown(f"**{r['Ticker']}**")
+            row[1].markdown(r["Price"])
+            row[2].markdown(f"<span style='color:{bar_color};font-weight:700'>{r['Score']}</span>", unsafe_allow_html=True)
+            row[3].markdown(r["RSI"])
+            row[4].markdown(r["RS"])
+            row[5].markdown(r["BB %B"])
+            row[6].markdown(r["ATR %"])
+            row[7].markdown(f"<span style='color:{trend_color}'>{r['Trend']}</span>", unsafe_allow_html=True)
+            row[8].markdown(f"<span style='color:{macd_color}'>{r['MACD']}</span>", unsafe_allow_html=True)
+            row[9].button("↗", key=f"sc_{r['Ticker']}", use_container_width=True,
+                          on_click=_pick_ticker, args=(r["Ticker"],))
+    else:
+        st.warning("No results returned — try again or check your connection.")
