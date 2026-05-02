@@ -114,8 +114,13 @@ with col_title:
     st.title("🔬 Semiconductor Screener")
     st.caption("Top 10 semiconductors ranked by breakout score  ·  same criteria as main dashboard")
 with col_back:
+    try:
+        _host = st.context.headers.get("host") or st.context.headers.get("Host") or "localhost:8501"
+        _base = f"https://{_host}" if "streamlit.app" in _host else f"http://{_host}"
+    except Exception:
+        _base = "http://localhost:8501"
     st.markdown(
-        '<a href="/" target="_self" style="display:block;padding:0.4rem 0.75rem;'
+        f'<a href="{_base}" target="_self" style="display:block;padding:0.4rem 0.75rem;'
         'border-radius:0.5rem;border:1px solid rgba(250,250,250,0.2);'
         'text-decoration:none;color:inherit;text-align:center;font-size:0.875rem">'
         '← Back to Dashboard</a>',

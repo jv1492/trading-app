@@ -526,6 +526,11 @@ with st.sidebar:
     analyze_btn  = st.button("Analyze", type="primary", use_container_width=True)
     st.markdown("---")
     st.markdown("**Screeners:**")
+    try:
+        _host = st.context.headers.get("host") or st.context.headers.get("Host") or "localhost:8501"
+        _base = f"https://{_host}" if "streamlit.app" in _host else f"http://{_host}"
+    except Exception:
+        _base = "http://localhost:8501"
     _LINK_STYLE = (
         "display:block;padding:0.4rem 0.75rem;border-radius:0.5rem;"
         "border:1px solid rgba(250,250,250,0.2);text-decoration:none;"
@@ -533,13 +538,13 @@ with st.sidebar:
         "margin:0.2rem 0;width:100%;box-sizing:border-box;"
         "transition:background 0.15s"
     )
-    for url, label in [
-        ("/Semiconductor_Screener", "🔬 Semiconductor"),
-        ("/AI_Screener",            "🤖 Artificial Intelligence"),
-        ("/Energy_Screener",        "⚡ Energy"),
+    for slug, label in [
+        ("Semiconductor_Screener", "🔬 Semiconductor"),
+        ("AI_Screener",            "🤖 Artificial Intelligence"),
+        ("Energy_Screener",        "⚡ Energy"),
     ]:
         st.markdown(
-            f'<a href="{url}" target="_blank" style="{_LINK_STYLE}"'
+            f'<a href="{_base}/{slug}" target="_blank" style="{_LINK_STYLE}"'
             f' onmouseover="this.style.background=\'rgba(255,255,255,0.08)\'"'
             f' onmouseout="this.style.background=\'transparent\'"'
             f'>{label}</a>',
