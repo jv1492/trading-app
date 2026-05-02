@@ -494,6 +494,7 @@ with st.sidebar:
     for i, q in enumerate(quick):
         if cols[i % 2].button(q, use_container_width=True, key=f"q_{q}"):
             st.session_state["selected_ticker"] = q
+            st.session_state["last_ticker"] = q
             st.rerun()
 
     st.markdown("---")
@@ -512,6 +513,7 @@ with st.sidebar:
                 label = f"**{m['symbol']}** — {m['name']}" if m["name"] else m["symbol"]
                 if st.button(label, key=f"sr_{m['symbol']}", use_container_width=True):
                     st.session_state["selected_ticker"] = m["symbol"]
+                    st.session_state["last_ticker"] = m["symbol"]
                     st.session_state["_company_search"] = ""
                     st.rerun()
         else:
