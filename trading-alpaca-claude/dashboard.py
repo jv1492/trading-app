@@ -70,7 +70,7 @@ st.markdown("""
     div[data-testid="stMetricLabel"] { font-size: 0.75rem !important;
                                        color: #a0a0b0 !important; }
     section[data-testid="stSidebar"] h1 {margin-top:-3rem; border: 0px solid red; }
-    section[data-testid="stSidebarNav"] { display: none !important; }
+    div [data-testid="stSidebarNav"] { display: none !important; }
     .subtitle { font-size: 1.2rem !important; font-weight: 600; margin-top: -1rem !important; color: inherit; }
 </style>
 """, unsafe_allow_html=True)
