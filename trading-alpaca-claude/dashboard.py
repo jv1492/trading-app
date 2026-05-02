@@ -526,9 +526,11 @@ with st.sidebar:
     analyze_btn  = st.button("Analyze", type="primary", use_container_width=True)
     st.markdown("---")
     st.markdown("**Screeners:**")
-    st.page_link("pages/Semiconductor_Screener.py", label="🔬 Semiconductor Screener",
+    st.page_link("pages/Semiconductor_Screener.py", label="🔬 Semiconductor",
                  use_container_width=True)
     st.page_link("pages/AI_Screener.py", label="🤖 Artificial Intelligence",
+                 use_container_width=True)
+    st.page_link("pages/Energy_Screener.py", label="⚡ Energy",
                  use_container_width=True)
 
     st.markdown("---")
