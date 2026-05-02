@@ -293,6 +293,116 @@ def run_analysis(ticker, account_size):
         close_hist=C, volume_hist=V, rsi_hist=rsi_s, macd_hist_ser=mh,
     )
 
+# ── Semiconductor universe ───────────────────────────────────────────
+SEMI_UNIVERSE = [
+    "NVDA","AMD","INTC","QCOM","MU","AVGO","TXN","AMAT","LRCX","KLAC",
+    "SNPS","CDNS","ADI","TSM","ASML","ON","MCHP","MPWR","SWKS","SITM",
+    "WOLF","CRUS","RMBS","POWI","UMC","GFS","ACMR","SMTC","SLAB","FORM",
+]
+
+@st.cache_data(ttl=86400)
+def run_semi_scan():
+    try:
+        raw   = yf.download(SEMI_UNIVERSE, period="6mo", interval="1d",
+                            group_by="ticker", progress=False,
+                            auto_adjust=True, threads=True)
+        spy_c = yf.download("SPY", period="6mo", interval="1d",
+                            progress=False, auto_adjust=True)["Close"].squeeze()
+    except Exception:
+        return []
+
+    results = []
+    for sym in SEMI_UNIVERSE:
+        try:
+            df = raw[sym].dropna()
+            if len(df) < 60: continue
+            C = df["Close"].squeeze(); H = df["High"].squeeze(); L = df["Low"].squeeze()
+            cur = float(C.iloc[-1])
+
+            s20  = C.rolling(20).mean(); s50 = C.rolling(50).mean()
+            s200 = C.rolling(min(200, len(C))).mean()
+            s20v, s50v, s200v = float(s20.iloc[-1]), float(s50.iloc[-1]), float(s200.iloc[-1])
+            s20_sl = float(s20.iloc[-1] - s20.iloc[-6])
+            s50_sl = float(s50.iloc[-1] - s50.iloc[-6])
+
+            d    = C.diff()
+            g    = d.clip(lower=0).rolling(14).mean()
+            lv   = (-d.clip(upper=0)).rolling(14).mean().replace(0, np.nan)
+            rsi_v = float((100 - (100 / (1 + g / lv))).iloc[-1])
+
+            ml   = C.ewm(span=12, adjust=False).mean() - C.ewm(span=26, adjust=False).mean()
+            mh_v = float((ml - ml.ewm(span=9, adjust=False).mean()).iloc[-1])
+
+            bb_std = C.rolling(20).std()
+            bb_pct = float(((C - (s20 - 2*bb_std)) / (4*bb_std).replace(0, np.nan)).iloc[-1])
+
+            tr      = pd.concat([(H-L),(H-C.shift()).abs(),(L-C.shift()).abs()], axis=1).max(axis=1)
+            atr_pct = float(tr.rolling(20).mean().iloc[-1] / cur * 100)
+
+            cmb   = pd.concat([C.rename("s"), spy_c.rename("spy")], axis=1).dropna()
+            sr    = float((cmb["s"].iloc[-1]  - cmb["s"].iloc[0])   / cmb["s"].iloc[0])
+            spyr  = float((cmb["spy"].iloc[-1] - cmb["spy"].iloc[0]) / cmb["spy"].iloc[0])
+            rs_sc = round(min(99, max(1, 50 + (sr - spyr) * 100 * 1.2)), 1)
+
+            trend_up = cur > s20v and cur > s50v and s20_sl > 0 and s50_sl > 0
+            sc = 0.0
+            if trend_up:                sc += 2.0
+            if cur > s200v:             sc += 1.0
+            if 50 <= rsi_v <= 70:       sc += 2.0
+            elif 45 <= rsi_v < 50:      sc += 0.5
+            if mh_v > 0:                sc += 1.5
+            if 0.4 <= bb_pct <= 0.75:   sc += 2.0
+            elif 0.75 < bb_pct <= 0.88: sc += 0.5
+            if atr_pct < 2.5:           sc += 1.0
+            if rs_sc > 60:              sc += 1.5
+            elif rs_sc > 50:            sc += 0.5
+
+            results.append({
+                "Ticker": sym, "Price": f"${cur:.2f}", "Score": round(sc, 1),
+                "RSI": round(rsi_v, 1), "RS": round(rs_sc, 1),
+                "BB %B": round(bb_pct, 2), "ATR %": round(atr_pct, 2),
+                "Trend": "↑ UP" if trend_up else "—", "MACD": "▲" if mh_v > 0 else "▼",
+            })
+        except Exception:
+            continue
+
+    return sorted(results, key=lambda x: x["Score"], reverse=True)[:10]
+
+@st.dialog("🔬 Top 10 Semiconductors  —  Breakout Score", width="large")
+def semi_screener_dialog():
+    if st.button("🔄 Refresh", key="_semi_refresh"):
+        run_semi_scan.clear()
+    with st.spinner("Scanning semiconductors..."):
+        rows = run_semi_scan()
+    if not rows:
+        st.warning("Could not load data. Try refreshing.")
+        return
+    max_sc = max(r["Score"] for r in rows) or 1
+    hdr = st.columns([1, 1.2, 1, 0.8, 0.8, 0.8, 0.8, 0.9, 0.7, 1])
+    for col, lbl in zip(hdr, ["#","Ticker","Price","Score","RSI","RS","BB %B","Trend","MACD","Analyze"]):
+        col.markdown(f"**{lbl}**")
+    st.markdown("<hr style='margin:4px 0'>", unsafe_allow_html=True)
+    for i, r in enumerate(rows, 1):
+        pct   = r["Score"] / max_sc
+        color = "#00c896" if pct > 0.75 else ("#ffd166" if pct > 0.5 else "#a0a0b0")
+        t_col = "#00c896" if "UP" in r["Trend"] else "#a0a0b0"
+        m_col = "#00c896" if r["MACD"] == "▲" else "#ff4d6d"
+        bar   = "█" * int(r["Score"]) + "░" * (10 - int(r["Score"]))
+        row   = st.columns([1, 1.2, 1, 0.8, 0.8, 0.8, 0.8, 0.9, 0.7, 1])
+        row[0].markdown(f"{i}")
+        row[1].markdown(f"**{r['Ticker']}**")
+        row[2].markdown(r["Price"])
+        row[3].markdown(f"<span style='color:{color};font-weight:700'>{r['Score']} {bar}</span>", unsafe_allow_html=True)
+        row[4].markdown(str(r["RSI"]))
+        row[5].markdown(str(r["RS"]))
+        row[6].markdown(str(r["BB %B"]))
+        row[7].markdown(f"<span style='color:{t_col}'>{r['Trend']}</span>", unsafe_allow_html=True)
+        row[8].markdown(f"<span style='color:{m_col}'>{r['MACD']}</span>", unsafe_allow_html=True)
+        if row[9].button("↗", key=f"semi_dlg_{r['Ticker']}", use_container_width=True):
+            _pick_ticker(r["Ticker"])
+            st.rerun()
+    st.caption(f"Cached daily · {datetime.now().strftime('%Y-%m-%d %H:%M')}  ·  ⚠ Not financial advice")
+
 # ── Market Data Feeds ────────────────────────────────────────────────
 
 def search_ticker(query):
@@ -523,6 +633,11 @@ with st.sidebar:
     account_size = st.number_input("Account Size ($)", min_value=1000, max_value=10_000_000,
                                    value=10_000, step=1000)
     analyze_btn  = st.button("Analyze", type="primary", use_container_width=True)
+    st.markdown("---")
+    st.markdown("**Screeners:**")
+    if st.button("🔬 Semiconductor Screener", use_container_width=True):
+        semi_screener_dialog()
+
     st.markdown("---")
     st.caption("Data: Yahoo Finance · Indicators calculated in Python")
     st.caption("⚠ Not financial advice")
