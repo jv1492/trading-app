@@ -528,6 +528,8 @@ with st.sidebar:
     st.markdown("**Screeners:**")
     st.page_link("pages/Semiconductor_Screener.py", label="🔬 Semiconductor Screener",
                  use_container_width=True)
+    st.page_link("pages/AI_Screener.py", label="🤖 Artificial Intelligence",
+                 use_container_width=True)
 
     st.markdown("---")
     st.caption("Data: Yahoo Finance · Indicators calculated in Python")
