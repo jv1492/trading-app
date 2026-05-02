@@ -545,7 +545,7 @@ with st.sidebar:
         ("Energy_Screener",        "⚡ Energy"),
     ]:
         st.markdown(
-            f'<a href="{_base}/{slug}" target="_blank" style="{_LINK_STYLE}"'
+            f'<a href="{_base}/{slug}" target="_blank" rel="noopener noreferrer" style="{_LINK_STYLE}"'
             f' onmouseover="this.style.background=\'rgba(255,255,255,0.08)\'"'
             f' onmouseout="this.style.background=\'transparent\'"'
             f'>{label}</a>',

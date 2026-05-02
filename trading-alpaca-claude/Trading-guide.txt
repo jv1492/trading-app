@@ -1,0 +1,18 @@
+These are candlestick and chart patterns detected on the current stock. Here's what each means for you:
+
+⚪ Doji (Weekly · Neutral)
+The open and close were nearly the same price — the market is undecided. On the weekly chart this is significant — buyers and sellers are evenly matched. Often signals a pause or reversal coming. Watch which direction the next candle breaks.
+
+⚪ Inside Bar (Weekly · Neutral)
+Last week's candle was completely contained within the prior week's range — a compression signal. The stock is coiling. Whichever direction it breaks out of that range is usually a strong directional move. Traders use this to set breakout entries above the high or below the low.
+
+✅ Bull Flag (Daily · Bullish)
+This is the most actionable signal. The stock had a strong move up, then pulled back in a tight, orderly range — like a flag on a pole. This is a classic breakout setup. A break above the top of the flag on good volume is a buy entry. This is exactly what ChartMill's screener looks for.
+
+⚪ Squeeze / Consolidation (Daily · Neutral)
+The recent price range has tightened significantly compared to the past month — the stock is building energy. Combined with the Bull Flag, this reinforces that a move is coming. Direction depends on the broader trend.
+
+How to use all four together:
+
+The weekly Doji + Inside Bar tell you the stock is at a decision point on the bigger timeframe. The daily Bull Flag + Squeeze say it's set up for a breakout. If the overall trend is up (price above SMA50/200), this combination is a strong case for a buy entry above the flag's resistance, with a stop below the flag's low.
+

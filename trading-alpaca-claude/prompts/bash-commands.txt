@@ -1,10 +1,38 @@
 To relaunch dashboard anytime:
 streamlit run trading-alpaca-claude/dashboard.py
 
-Restart the dashboard to see it:
+Start the dashboard to see it:
 streamlit run dashboard.py
-treamlit run trading-alpaca-claude/dashboard.py
 
 For better performance, install the Watchdog module:
 $ xcode-select --install
 $ pip install watchdog
+
+# 1. Stage all the new/modified files
+git add trading-alpaca-claude/
+
+# 2. Commit
+git commit -m "Add dashboard, stock analyzer, TSM strategy, and watchlist prompts"
+
+# 3. Push to GitHub
+git push origin main
+Or if you want to stage and review everything at once:
+
+
+git add trading-alpaca-claude/
+git status          # confirm what's staged
+
+git commit -m "your message"
+git commit -a -m "your message"
+
+git push origin main
+
+
+#Run this to commit the pending changes:
+git add dashboard.py
+git commit -m "Update CSS padding and h1 font size"
+git push origin main
+
+#Run trading rules
+python3 strategy_tsla.py
+python3 strategy_tsm.py
