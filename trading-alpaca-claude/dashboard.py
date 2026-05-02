@@ -478,6 +478,10 @@ def get_analyst_data(ticker):
     except Exception:
         return None
 
+def _pick_ticker(sym):
+    st.session_state["selected_ticker"] = sym
+    st.session_state["last_ticker"] = sym
+
 # ── Sidebar ───────────────────────────────────────────────────────────
 if "selected_ticker" not in st.session_state:
     st.session_state["selected_ticker"] = "TSLA"
@@ -511,11 +515,8 @@ with st.sidebar:
         if matches:
             for m in matches:
                 label = f"**{m['symbol']}** — {m['name']}" if m["name"] else m["symbol"]
-                if st.button(label, key=f"sr_{m['symbol']}", use_container_width=True):
-                    st.session_state["selected_ticker"] = m["symbol"]
-                    st.session_state["last_ticker"] = m["symbol"]
-                    st.session_state["_company_search"] = ""
-                    st.rerun()
+                st.button(label, key=f"sr_{m['symbol']}", use_container_width=True,
+                          on_click=_pick_ticker, args=(m["symbol"],))
         else:
             st.caption("No results found.")
 
@@ -722,8 +723,6 @@ else:
 st.markdown("---")
 
 # ── Shared card renderer ──────────────────────────────────────────────
-def _pick_ticker(sym):
-    st.session_state["selected_ticker"] = sym
 
 def render_stock_cards(rows, key_prefix, yahoo_link=False):
     if not rows:
