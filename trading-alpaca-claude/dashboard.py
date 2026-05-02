@@ -526,12 +526,25 @@ with st.sidebar:
     analyze_btn  = st.button("Analyze", type="primary", use_container_width=True)
     st.markdown("---")
     st.markdown("**Screeners:**")
-    st.page_link("pages/Semiconductor_Screener.py", label="🔬 Semiconductor",
-                 use_container_width=True)
-    st.page_link("pages/AI_Screener.py", label="🤖 Artificial Intelligence",
-                 use_container_width=True)
-    st.page_link("pages/Energy_Screener.py", label="⚡ Energy",
-                 use_container_width=True)
+    _LINK_STYLE = (
+        "display:block;padding:0.4rem 0.75rem;border-radius:0.5rem;"
+        "border:1px solid rgba(250,250,250,0.2);text-decoration:none;"
+        "color:inherit;text-align:center;font-size:0.875rem;"
+        "margin:0.2rem 0;width:100%;box-sizing:border-box;"
+        "transition:background 0.15s"
+    )
+    for url, label in [
+        ("/Semiconductor_Screener", "🔬 Semiconductor"),
+        ("/AI_Screener",            "🤖 Artificial Intelligence"),
+        ("/Energy_Screener",        "⚡ Energy"),
+    ]:
+        st.markdown(
+            f'<a href="{url}" target="_blank" style="{_LINK_STYLE}"'
+            f' onmouseover="this.style.background=\'rgba(255,255,255,0.08)\'"'
+            f' onmouseout="this.style.background=\'transparent\'"'
+            f'>{label}</a>',
+            unsafe_allow_html=True,
+        )
 
     st.markdown("---")
     st.caption("Data: Yahoo Finance · Indicators calculated in Python")

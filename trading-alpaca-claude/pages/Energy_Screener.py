@@ -125,7 +125,13 @@ with col_title:
     st.title("⚡ Energy Companies Screener")
     st.caption("Top 10 energy stocks ranked by breakout score  ·  same criteria as main dashboard")
 with col_back:
-    st.page_link("dashboard.py", label="← Back to Dashboard", use_container_width=True)
+    st.markdown(
+        '<a href="/" target="_self" style="display:block;padding:0.4rem 0.75rem;'
+        'border-radius:0.5rem;border:1px solid rgba(250,250,250,0.2);'
+        'text-decoration:none;color:inherit;text-align:center;font-size:0.875rem">'
+        '← Back to Dashboard</a>',
+        unsafe_allow_html=True,
+    )
 
 st.markdown("---")
 
