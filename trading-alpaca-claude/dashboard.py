@@ -295,6 +295,23 @@ def run_analysis(ticker, account_size):
 
 # ── Market Data Feeds ────────────────────────────────────────────────
 
+def search_ticker(query):
+    try:
+        r = requests.get(
+            "https://query1.finance.yahoo.com/v1/finance/search",
+            params={"q": query, "quotesCount": 6, "newsCount": 0, "enableFuzzyQuery": True},
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=3
+        )
+        quotes = r.json().get("quotes", [])
+        return [
+            {"symbol": q["symbol"], "name": q.get("longname") or q.get("shortname", "")}
+            for q in quotes
+            if q.get("quoteType") in ("EQUITY", "ETF") and "." not in q.get("symbol", ".")
+        ][:6]
+    except Exception:
+        return []
+
 @st.cache_data(ttl=300)
 def get_most_active():
     try:
@@ -485,6 +502,21 @@ with st.sidebar:
         "Ticker Symbol", key="selected_ticker", max_chars=6
     ).upper().strip()
 
+    # Company name search — type a name to get ticker suggestions
+    search_query = st.text_input("🔍 Search company", placeholder="e.g. Apple, Taiwan Semi...",
+                                 key="_company_search", label_visibility="visible")
+    if search_query and len(search_query) >= 2:
+        matches = search_ticker(search_query)
+        if matches:
+            for m in matches:
+                label = f"**{m['symbol']}** — {m['name']}" if m["name"] else m["symbol"]
+                if st.button(label, key=f"sr_{m['symbol']}", use_container_width=True):
+                    st.session_state["selected_ticker"] = m["symbol"]
+                    st.session_state["_company_search"] = ""
+                    st.rerun()
+        else:
+            st.caption("No results found.")
+
     account_size = st.number_input("Account Size ($)", min_value=1000, max_value=10_000_000,
                                    value=10_000, step=1000)
     analyze_btn  = st.button("Analyze", type="primary", use_container_width=True)
@@ -530,7 +562,7 @@ st.markdown("---")
 
 # ── Trade Setup ───────────────────────────────────────────────────────
 st.markdown('<p class="section-hdr">Example Trade Setup</p>', unsafe_allow_html=True)
-st.warning("⚠ Auto-generated — not financial advice. Always set your own entry and exit points.")
+# st.warning("⚠ Auto-generated — not financial advice. Always set your own entry and exit points.")
 
 t1,t2,t3,t4,t5,t6 = st.columns(6)
 t1.metric("Entry",     f"${d['entry']:.2f}",   "Buy stop above 10d high")
