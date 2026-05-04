@@ -41,6 +41,17 @@ SCAN_UNIVERSE = [
     "ZM","DOCN","DBX","BOX","TWLO","MDB","ESTC","CFLT","GTLB","PATH",
 ]
 
+QUICK_PICK_NAMES = {
+    "TSLA": "Tesla",
+    "TSM":  "Taiwan Semiconductor",
+    "NVDA": "NVIDIA",
+    "AAPL": "Apple",
+    "META": "Meta",
+    "MSFT": "Microsoft",
+    "AMD":  "AMD",
+    "SBLK": "Star Bulk",
+}
+
 # ── Page Config ──────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Julio's Stock Analyzer",
@@ -197,11 +208,18 @@ def run_analysis(ticker, account_size):
 
     try:
         info     = yf.Ticker(ticker).info
-        co_name  = info.get("longName", ticker)
+        co_name  = info.get("longName") or info.get("shortName") or ticker
         sector   = info.get("sector",   "N/A")
         industry = info.get("industry", "N/A")
     except Exception:
         co_name = ticker; sector = industry = "N/A"
+    if co_name == ticker:
+        try:
+            hits = search_ticker(ticker)
+            if hits:
+                co_name = hits[0].get("name") or ticker
+        except Exception:
+            pass
 
     O,H,L,C,V = daily["Open"],daily["High"],daily["Low"],daily["Close"],daily["Volume"]
     cur = float(C.iloc[-1])
@@ -327,6 +345,7 @@ def get_most_active():
         return [
             {
                 "symbol": q.get("symbol", ""),
+                "name":   (q.get("shortName") or q.get("longName") or "")[:22],
                 "price":  q.get("regularMarketPrice", 0),
                 "chg":    q.get("regularMarketChangePercent", 0),
             }
@@ -443,15 +462,22 @@ def run_breakout_scan():
         except Exception:
             continue
 
-    return sorted(results, key=lambda x: x["Score"], reverse=True)[:25]
+    top25 = sorted(results, key=lambda x: x["Score"], reverse=True)[:25]
+    for r in top25:
+        try:
+            r["Name"] = (yf.Ticker(r["Ticker"]).info.get("shortName") or r["Ticker"])
+        except Exception:
+            r["Name"] = r["Ticker"]
+    return top25
 
 @st.cache_data(ttl=3600)
 def get_analyst_data(ticker):
     try:
-        t   = yf.Ticker(ticker)
-        rec = t.recommendations
-        apt = t.analyst_price_targets
-        cur = t.fast_info.last_price or 0
+        t    = yf.Ticker(ticker)
+        rec  = t.recommendations
+        apt  = t.analyst_price_targets
+        cur  = t.fast_info.last_price or 0
+        info = t.info
 
         if rec is not None and not rec.empty:
             r  = rec.iloc[-1]
@@ -465,20 +491,105 @@ def get_analyst_data(ticker):
 
         total = sb + b + h + s + ss
         return {
-            "total":         total,
-            "buy_count":     sb + b,
-            "hold_count":    h,
-            "sell_count":    s + ss,
-            "buy_pct":       (sb + b) / total * 100 if total else 0,
-            "hold_pct":      h        / total * 100 if total else 0,
-            "sell_pct":      (s + ss) / total * 100 if total else 0,
-            "high_target":   apt.get("high",   0) if apt else 0,
-            "median_target": apt.get("median", 0) if apt else 0,
-            "low_target":    apt.get("low",    0) if apt else 0,
-            "cur_price":     cur,
+            "total":          total,
+            "buy_count":      sb + b,
+            "hold_count":     h,
+            "sell_count":     s + ss,
+            "buy_pct":        (sb + b) / total * 100 if total else 0,
+            "hold_pct":       h        / total * 100 if total else 0,
+            "sell_pct":       (s + ss) / total * 100 if total else 0,
+            "high_target":    apt.get("high",   0) if apt else 0,
+            "median_target":  apt.get("median", 0) if apt else 0,
+            "low_target":     apt.get("low",    0) if apt else 0,
+            "cur_price":      cur,
+            # fundamentals for composite score
+            "rec_mean":       info.get("recommendationMean"),
+            "analyst_count":  info.get("numberOfAnalystOpinions", 0),
+            "roe":            info.get("returnOnEquity"),
+            "profit_margins": info.get("profitMargins"),
+            "revenue_growth": info.get("revenueGrowth"),
+            "earnings_growth":info.get("earningsGrowth"),
+            "short_pct":      info.get("shortPercentOfFloat"),
+            "inst_held":      info.get("heldPercentInstitutions"),
         }
     except Exception:
         return None
+
+
+def calc_composite_score(d, analyst):
+    """1-10 score from 6 freely available factors (similar to TipRanks Smart Score)."""
+    factors = {}
+
+    # 1. Analyst consensus (0-10)
+    rec = (analyst or {}).get("rec_mean")
+    if rec:
+        raw = max(0, (5 - rec) / 4 * 10)
+        if (analyst.get("analyst_count") or 0) >= 20:
+            raw = min(10, raw * 1.05)
+        factors["Analyst"] = round(raw, 1)
+    else:
+        factors["Analyst"] = 5.0
+
+    # 2. Technical indicators (0-10) — already computed
+    factors["Technical"] = d["tech_score"]
+
+    # 3. Relative strength vs SPY (0-10)
+    factors["Rel. Strength"] = round(min(10, d["rs_sc"] / 10), 1)
+
+    # 4. Fundamentals: ROE, margins, growth (0-10)
+    sc = 0.0
+    roe = (analyst or {}).get("roe") or 0
+    pm  = (analyst or {}).get("profit_margins") or 0
+    rg  = (analyst or {}).get("revenue_growth") or 0
+    eg  = (analyst or {}).get("earnings_growth") or 0
+    if roe > 0:    sc += 2.0
+    if roe > 0.15: sc += 1.0
+    if roe > 0.30: sc += 1.0
+    if pm  > 0:    sc += 1.0
+    if pm  > 0.10: sc += 1.0
+    if pm  > 0.20: sc += 1.0
+    if rg  > 0.05: sc += 1.0
+    if rg  > 0.15: sc += 0.5
+    if eg  > 0:    sc += 1.0
+    if eg  > 0.15: sc += 0.5
+    factors["Fundamentals"] = round(min(10, sc), 1)
+
+    # 5. Institutional ownership — peaks at 65-85% held
+    inst = (analyst or {}).get("inst_held") or 0.5
+    if inst < 0.30:
+        inst_sc = 3.0
+    elif inst < 0.50:
+        inst_sc = 5.0 + (inst - 0.30) / 0.20 * 2
+    elif inst < 0.85:
+        inst_sc = 7.0 + (inst - 0.50) / 0.35 * 3
+    else:
+        inst_sc = 7.5  # over-owned, slight penalty
+    factors["Institutions"] = round(min(10, inst_sc), 1)
+
+    # 6. Short interest — low short = bullish (0-10)
+    short = (analyst or {}).get("short_pct") or 0
+    if short < 0.01:
+        short_sc = 10.0
+    elif short < 0.03:
+        short_sc = 8.0 - (short - 0.01) / 0.02 * 2
+    elif short < 0.07:
+        short_sc = 6.0 - (short - 0.03) / 0.04 * 3
+    elif short < 0.15:
+        short_sc = 3.0 - (short - 0.07) / 0.08 * 2
+    else:
+        short_sc = 1.0
+    factors["Low Short %"] = round(max(0, short_sc), 1)
+
+    weights = {
+        "Analyst":      0.22,
+        "Technical":    0.20,
+        "Rel. Strength":0.15,
+        "Fundamentals": 0.20,
+        "Institutions": 0.13,
+        "Low Short %":  0.10,
+    }
+    composite = sum(factors[k] * weights[k] for k in factors)
+    return round(max(1.0, min(10.0, composite)), 1), factors
 
 def _pick_ticker(sym):
     st.session_state["selected_ticker"] = sym
@@ -498,7 +609,8 @@ with st.sidebar:
     quick = ["TSLA","TSM","NVDA","AAPL","META","MSFT","AMD","SBLK"]
     cols  = st.columns(2)
     for i, q in enumerate(quick):
-        if cols[i % 2].button(q, use_container_width=True, key=f"q_{q}"):
+        if cols[i % 2].button(q, use_container_width=True, key=f"q_{q}",
+                              help=QUICK_PICK_NAMES.get(q, "")):
             st.session_state["selected_ticker"] = q
             st.session_state["last_ticker"] = q
             st.rerun()
@@ -572,7 +684,7 @@ if d is None:
     st.stop()
 
 # ── Header ────────────────────────────────────────────────────────────
-st.title(f"{d['co_name']}  `{d['ticker']}`")
+st.title(f"{d['ticker']}  `{d['co_name']}`")
 st.caption(f"{d['sector']} / {d['industry']}  ·  Generated {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 st.markdown("---")
 
@@ -699,7 +811,7 @@ st.markdown('<p class="section-hdr">Analyst Forecasts</p>', unsafe_allow_html=Tr
 analyst = get_analyst_data(ticker)
 
 if analyst and analyst["total"] > 0:
-    fa_left, fa_right = st.columns([1, 1])
+    fa_left, fa_right, fa_score = st.columns([1, 1, 1])
 
     with fa_left:
         st.markdown(f"**{analyst['total']} Analyst Ratings**")
@@ -746,6 +858,40 @@ if analyst and analyst["total"] > 0:
                     f"</div>",
                     unsafe_allow_html=True
                 )
+
+    with fa_score:
+        composite, factors = calc_composite_score(d, analyst)
+        sc_color = "#00c896" if composite >= 8 else ("#ffd166" if composite >= 6 else ("#ff9a3c" if composite >= 4 else "#ff4d6d"))
+        verdict  = "Outperform" if composite >= 8 else ("Neutral" if composite >= 5 else "Underperform")
+        st.markdown("**Composite Score**")
+        st.markdown(
+            f"<div style='background:#1e1e2e;border-radius:12px;padding:16px 20px;"
+            f"display:flex;align-items:center;gap:20px;margin-bottom:10px'>"
+            f"<div style='font-size:3rem;font-weight:800;color:{sc_color};line-height:1'>{composite}</div>"
+            f"<div><div style='font-size:.75rem;color:#a0a0b0'>out of 10</div>"
+            f"<div style='font-size:.85rem;font-weight:600;color:{sc_color}'>{verdict}</div></div>"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+        for fname, fval in factors.items():
+            bar_pct   = fval / 10 * 100
+            bar_color = "#00c896" if fval >= 7 else ("#ffd166" if fval >= 5 else "#ff4d6d")
+            st.markdown(
+                f"<div style='margin:5px 0'>"
+                f"<div style='display:flex;justify-content:space-between;font-size:.75rem;margin-bottom:2px'>"
+                f"<span style='color:#c0c0d0'>{fname}</span>"
+                f"<span style='color:{bar_color};font-weight:600'>{fval:.1f}</span></div>"
+                f"<div style='background:#2a2a3e;border-radius:4px;height:5px'>"
+                f"<div style='background:{bar_color};width:{bar_pct:.0f}%;height:5px;border-radius:4px'>"
+                f"</div></div></div>",
+                unsafe_allow_html=True
+            )
+        st.markdown(
+            "<div style='font-size:.65rem;color:#606070;margin-top:8px'>"
+            "Analyst · Technical · Rel.Strength · Fundamentals · Institutions · Short%"
+            "</div>",
+            unsafe_allow_html=True
+        )
 else:
     st.caption("No analyst data available for this ticker.")
 
@@ -760,14 +906,19 @@ def render_stock_cards(rows, key_prefix, yahoo_link=False):
     cols = st.columns(len(rows))
     for i, row in enumerate(rows):
         sym   = row["symbol"]
+        name  = row.get("name", "")
         price = row["price"]
         chg   = row["chg"]
         color = "#00c896" if chg >= 0 else "#ff4d6d"
         arrow = "▲" if chg >= 0 else "▼"
+        name_html = (f"<div style='font-size:.63rem;color:#8888a8;overflow:hidden;"
+                     f"text-overflow:ellipsis;white-space:nowrap;padding:0 2px'>{name}</div>"
+                     if name else "")
         cols[i].markdown(
             f"<div style='background:#1e1e2e;border-radius:8px;padding:10px 6px;"
             f"text-align:center;margin:2px'>"
             f"<div style='font-weight:700;font-size:.9rem'>{sym}</div>"
+            f"{name_html}"
             f"<div style='font-size:.8rem;color:#d0d0e0'>${price:.2f}</div>"
             f"<div style='color:{color};font-size:.8rem;font-weight:600'>"
             f"{arrow} {abs(chg):.2f}%</div></div>",
@@ -854,7 +1005,9 @@ if run_scan or "scan_done" in st.session_state:
             macd_color  = "#00c896" if r["MACD"] == "▲" else "#ff4d6d"
 
             row = st.columns([1.2, 1, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8])
-            row[0].markdown(f"**{r['Ticker']}**")
+            name_str = r.get("Name", "")
+            name_sub = f"<br><span style='font-size:.68rem;color:#8888a8;font-weight:400'>{name_str}</span>" if name_str and name_str != r["Ticker"] else ""
+            row[0].markdown(f"**{r['Ticker']}**{name_sub}", unsafe_allow_html=True)
             row[1].markdown(r["Price"])
             row[2].markdown(f"<span style='color:{bar_color};font-weight:700'>{r['Score']}</span>", unsafe_allow_html=True)
             row[3].markdown(r["RSI"])
