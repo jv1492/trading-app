@@ -4,9 +4,13 @@
 # Account: trade-app | Mode: paper
 # Config: trading-alpaca-claude/alpaca-config.json
 
-BASE_URL="https://paper-api.alpaca.markets/v2"
-API_KEY="PK5TSOUE524H625IZGF3BJZEBF"
-SECRET_KEY="HbQseBQaXpEFHDE21zZCSQUi2GhhWfWnmUKZqC1Vvh2x"
+# Load credentials from .env (never commit .env to git)
+# Copy .env.example to .env and fill in your keys
+set -a; source "$(dirname "$0")/.env"; set +a
+
+BASE_URL="$ALPACA_BASE_URL"
+API_KEY="$ALPACA_API_KEY"
+SECRET_KEY="$ALPACA_SECRET_KEY"
 
 # ─────────────────────────────────────────────
 # SETUP

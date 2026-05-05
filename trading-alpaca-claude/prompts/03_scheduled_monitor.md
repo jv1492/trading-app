@@ -23,8 +23,8 @@ You are a TSLA trailing stop strategy monitor. Run the Python script below using
 ## Alpaca Paper Trading Credentials
 - Base URL: https://paper-api.alpaca.markets/v2
 - Data URL: https://data.alpaca.markets/v2
-- API Key: PK5TSOUE524H625IZGF3BJZEBF
-- Secret Key: HbQseBQaXpEFHDE21zZCSQUi2GhhWfWnmUKZqC1Vvh2x
+- API Key: PK74KUHTNG2CYS3WDRU6WH5VC5
+- Secret Key: 4xGmMFCxq98tp9uENPt5ASNdzsjjLG53PxiZGBSZm59i
 
 ## Strategy Parameters
 - Symbol: TSLA

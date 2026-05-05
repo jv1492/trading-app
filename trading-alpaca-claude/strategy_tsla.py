@@ -10,19 +10,11 @@ Rules:
 """
 
 import requests
+from config import BASE_URL, DATA_URL, HEADERS
 import time
 from datetime import datetime
 
 # ── Credentials ────────────────────────────────────────────────────
-BASE_URL   = "https://paper-api.alpaca.markets/v2"
-DATA_URL   = "https://data.alpaca.markets/v2"
-API_KEY    = "PK5TSOUE524H625IZGF3BJZEBF"
-SECRET_KEY = "HbQseBQaXpEFHDE21zZCSQUi2GhhWfWnmUKZqC1Vvh2x"
-HEADERS    = {
-    "APCA-API-KEY-ID": API_KEY,
-    "APCA-API-SECRET-KEY": SECRET_KEY,
-    "Content-Type": "application/json"
-}
 
 # ── Strategy Parameters ─────────────────────────────────────────────
 SYMBOL        = "TSLA"
