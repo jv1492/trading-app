@@ -380,6 +380,75 @@ def get_trending():
     except Exception:
         return []
 
+@st.cache_data(ttl=300)
+def get_premarket_gaps(min_gap_pct=0.5):
+    universe = [
+        "AAPL","MSFT","NVDA","AMZN","META","GOOGL","TSLA","AVGO","JPM","V",
+        "MA","UNH","BAC","NFLX","CRM","AMD","QCOM","ORCL","ADBE","MU",
+        "AMAT","LRCX","PANW","CRWD","PLTR","COIN","SQ","PYPL","UBER","DASH",
+        "ABNB","SNOW","DDOG","NET","ZS","TSM","ASML","BABA","SE","MELI",
+        "SPOT","RIVN","NIO","SOFI","HOOD","INTC","CSCO","TXN","GS","MS",
+    ]
+    try:
+        raw = yf.download(
+            universe, period="2d", interval="1m",
+            prepost=True, group_by="ticker",
+            progress=False, auto_adjust=True, threads=True
+        )
+    except Exception:
+        return []
+
+    results = []
+    for sym in universe:
+        try:
+            df = raw[sym].dropna() if len(universe) > 1 else raw.dropna()
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+            if df.empty or len(df) < 5:
+                continue
+
+            if df.index.tz is None:
+                df.index = df.index.tz_localize("UTC").tz_convert("America/New_York")
+            else:
+                df.index = df.index.tz_convert("America/New_York")
+
+            today = df.index[-1].normalize()
+
+            # Previous regular-session close: last bar before today between 9:30–16:00
+            prev_reg = df[
+                (df.index < today) &
+                ((df.index.hour > 9) | ((df.index.hour == 9) & (df.index.minute >= 30))) &
+                (df.index.hour < 16)
+            ]
+            if prev_reg.empty:
+                continue
+            prev_close = float(prev_reg["Close"].iloc[-1])
+
+            # Pre-market today: bars before 09:30
+            pm_bars = df[
+                (df.index >= today) &
+                ((df.index.hour < 9) | ((df.index.hour == 9) & (df.index.minute < 30)))
+            ]
+            if pm_bars.empty:
+                continue
+            pm_price  = float(pm_bars["Close"].iloc[-1])
+            pm_volume = int(pm_bars["Volume"].sum())
+
+            gap_pct = (pm_price - prev_close) / prev_close * 100
+            if gap_pct >= min_gap_pct:
+                results.append({
+                    "Ticker":     sym,
+                    "Prev Close": prev_close,
+                    "Pre-Mkt":    pm_price,
+                    "Gap %":      round(gap_pct, 2),
+                    "PM Volume":  pm_volume,
+                })
+        except Exception:
+            continue
+
+    return sorted(results, key=lambda x: x["Gap %"], reverse=True)
+
+
 @st.cache_data(ttl=86400)
 def run_breakout_scan():
     tickers = list(dict.fromkeys(SCAN_UNIVERSE))
@@ -941,6 +1010,52 @@ st.markdown("---")
 # ── Trending Now ──────────────────────────────────────────────────────
 st.markdown('<p class="section-hdr">🔥 Trending Now  —  Yahoo Finance</p>', unsafe_allow_html=True)
 render_stock_cards(get_trending(), "tr", yahoo_link=True)
+
+st.markdown("---")
+
+# ── Pre-Market Bullish Gaps ───────────────────────────────────────────
+st.markdown('<p class="section-hdr">🌅 Pre-Market Bullish Gaps</p>', unsafe_allow_html=True)
+
+pm_ctrl1, pm_ctrl2, pm_ctrl3, pm_ctrl4 = st.columns([1, 0.55, 1.1, 4])
+run_pm = pm_ctrl1.button("▶ Run Scan", key="pm_run", type="primary", use_container_width=True)
+pm_ctrl2.markdown("<p style='padding-top:6px; margin:0; font-size:14px'>Min Gap %</p>", unsafe_allow_html=True)
+min_gap = pm_ctrl3.number_input("Min Gap %", min_value=2.0, max_value=10.0,
+                                 value=2.0, step=1.0, format="%.1f", label_visibility="collapsed")
+pm_ctrl4.caption("Scans 50 liquid US stocks · Compares latest pre-market price to prior session close · Cached 5 min")
+
+if run_pm:
+    st.cache_data.clear()  # force fresh data on manual run
+
+if run_pm or "pm_done" in st.session_state:
+    st.session_state["pm_done"] = True
+    with st.spinner("Fetching pre-market data..."):
+        pm_results = get_premarket_gaps(min_gap_pct=min_gap)
+
+    if pm_results:
+        st.success(f"{len(pm_results)} stocks gapping up ≥ {min_gap:.1f}% in pre-market")
+
+        hdr = st.columns([1, 1.1, 1.1, 0.9, 1.2, 0.7])
+        for col, lbl in zip(hdr, ["Ticker", "Prev Close", "Pre-Mkt", "Gap %", "PM Volume", "Chart"]):
+            col.markdown(f"**{lbl}**")
+        st.markdown("<hr style='margin:4px 0'>", unsafe_allow_html=True)
+
+        for r in pm_results:
+            gap_color = "#00c896" if r["Gap %"] >= 2 else ("#ffd166" if r["Gap %"] >= 1 else "#a8d8a8")
+            row = st.columns([1, 1.1, 1.1, 0.9, 1.2, 0.7])
+            row[0].markdown(f"**{r['Ticker']}**")
+            row[1].markdown(f"${r['Prev Close']:.2f}")
+            row[2].markdown(f"${r['Pre-Mkt']:.2f}")
+            row[3].markdown(
+                f"<span style='color:{gap_color};font-weight:700'>▲ {r['Gap %']:.2f}%</span>",
+                unsafe_allow_html=True
+            )
+            vol = r["PM Volume"]
+            vol_str = f"{vol/1_000_000:.1f}M" if vol >= 1_000_000 else (f"{vol/1_000:.0f}K" if vol >= 1_000 else str(vol))
+            row[4].markdown(vol_str)
+            row[5].button("↗", key=f"pm_{r['Ticker']}", use_container_width=True,
+                          on_click=_pick_ticker, args=(r["Ticker"],))
+    elif run_pm or "pm_done" in st.session_state:
+        st.info(f"No stocks gapping up ≥ {min_gap:.1f}% in pre-market right now.")
 
 st.markdown("---")
 
