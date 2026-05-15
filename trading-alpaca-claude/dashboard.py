@@ -964,6 +964,85 @@ if analyst and analyst["total"] > 0:
 else:
     st.caption("No analyst data available for this ticker.")
 
+st.markdown('<p class="section-hdr">5-Year Forecast</p>', unsafe_allow_html=True)
+
+forecast_start = pd.Timestamp.now().normalize()
+forecast_end = (forecast_start + pd.DateOffset(years=5)).strftime("%Y-%m-%d")
+
+fc_col1, fc_col2 = st.columns([1, 1])
+with fc_col1:
+    forecast_investment = st.number_input(
+        "Forecast investment ($)", min_value=100.0, max_value=10_000_000.0,
+        value=4000.0, step=100.0, format="%.2f",
+        help="Amount to allocate for 5-year growth projections."
+    )
+    forecast_purchase = st.number_input(
+        "Purchase price ($)", min_value=0.01, max_value=10000.0,
+        value=float(d["cur"]), step=0.01, format="%.2f",
+        help="Price per share used to calculate the number of shares purchased."
+    )
+    forecast_target_5y = st.number_input(
+        "5-Year target price ($)", min_value=0.01, max_value=10000.0,
+        value=round(max(d["cur"] * 1.5, d["cur"] + 10), 2), step=0.01, format="%.2f",
+        help="Target price for this ticker after 5 years."
+    )
+with fc_col2:
+    forecast_cagr = st.number_input(
+        "5-Year CAGR assumption (%)", min_value=-50.0, max_value=100.0,
+        value=10.0, step=0.1, format="%.1f",
+        help="Annual growth rate assumption used for the CAGR projection."
+    )
+    st.markdown(
+        f"<div style='background:#1e1e2e;border-radius:10px;padding:14px;'>"
+        f"<div style='font-size:.85rem;color:#a0a0b0;margin-bottom:8px'>Forecast horizon</div>"
+        f"<div style='font-size:1.4rem;font-weight:700'>{forecast_start.strftime('%Y-%m-%d')} → {forecast_end}</div>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+shares_forecast = int(forecast_investment / forecast_purchase) if forecast_purchase else 0
+invested_amount = round(shares_forecast * forecast_purchase, 2)
+cash_leftover = round(forecast_investment - invested_amount, 2)
+target_value_5y = round(shares_forecast * forecast_target_5y, 2)
+if invested_amount:
+    target_return_pct = round((target_value_5y / invested_amount - 1) * 100, 2)
+    cagr_value = round(invested_amount * ((1 + forecast_cagr / 100) ** 5), 2)
+    cagr_return_pct = round((cagr_value / invested_amount - 1) * 100, 2)
+else:
+    target_return_pct = 0.0
+    cagr_value = 0.0
+    cagr_return_pct = 0.0
+implied_cagr = round(((forecast_target_5y / forecast_purchase) ** (1 / 5) - 1) * 100, 2) if forecast_purchase else 0.0
+
+proj_col1, proj_col2, proj_col3 = st.columns([1, 1, 1])
+proj_col1.metric("Shares purchased", f"{shares_forecast}", f"Based on ${forecast_purchase:.2f} entry")
+proj_col2.metric("Invested capital", f"${invested_amount:,.2f}", f"${cash_leftover:,.2f} cash leftover")
+proj_col3.metric("Target CAGR implied", f"{implied_cagr:.1f}%", f"To reach ${forecast_target_5y:.2f}")
+
+c1, c2 = st.columns(2)
+with c1:
+    st.markdown("**5-Year target price projection**")
+    st.markdown(
+        f"<div style='background:#1e1e2e;border-radius:10px;padding:16px;margin-top:8px;'>"
+        f"<div style='font-size:.85rem;color:#a0a0b0'>Target price</div>"
+        f"<div style='font-size:1.8rem;font-weight:700'>${forecast_target_5y:.2f}</div>"
+        f"<div style='margin-top:8px;color:#00c896;font-weight:700'>{target_return_pct:+.2f}%</div>"
+        f"<div style='margin-top:6px;color:#c0c0d0;font-size:.85rem'>Future value: ${target_value_5y:,.2f}</div>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+with c2:
+    st.markdown("**5-Year CAGR projection**")
+    st.markdown(
+        f"<div style='background:#1e1e2e;border-radius:10px;padding:16px;margin-top:8px;'>"
+        f"<div style='font-size:.85rem;color:#a0a0b0'>CAGR assumption</div>"
+        f"<div style='font-size:1.8rem;font-weight:700'>{forecast_cagr:.1f}%</div>"
+        f"<div style='margin-top:8px;color:#00c896;font-weight:700'>{cagr_return_pct:+.2f}%</div>"
+        f"<div style='margin-top:6px;color:#c0c0d0;font-size:.85rem'>Future value: ${cagr_value:,.2f}</div>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
 st.markdown("---")
 
 # ── Shared card renderer ──────────────────────────────────────────────
